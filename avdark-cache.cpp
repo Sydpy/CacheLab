@@ -121,12 +121,21 @@ avdc_access(avdark_cache_t *self, avdc_pa_t pa, avdc_access_type_t type)
         /* TODO: Update this function */
         avdc_tag_t tag = tag_from_pa(self, pa);
         int index = index_from_pa(self, pa);
-        int hit;
+        int hit = 0;
 
-        hit = self->lines[index].valid && self->lines[index].tag == tag;
+        /* position inside set */
+        unsigned i;
+        /* number of valid pages inside the set */
+        int valid = 0;
+
+        for(i = 0; i < self->assoc && !hit; i++) {
+                valid = self->lines[index][i].valid ? valid+1:valid;
+                hit = self->lines[index][i].valid && self->lines[index][i].tag == tag;
+        }
+
         if (!hit) {
-                self->lines[index].valid = 1;
-                self->lines[index].tag = tag;
+                self->lines[index][valid % self->assoc].valid = 1;
+                self->lines[index][valid % self->assoc].tag = tag;
         }
 
         switch (type) {
@@ -153,8 +162,10 @@ avdc_flush_cache(avdark_cache_t *self)
 {
         /* TODO: Update this function */
         for (int i = 0; i < self->number_of_sets; i++) {
-                self->lines[i].valid = 0;
-                self->lines[i].tag = 0;
+                for (unsigned j = 0; j < self->assoc; j++) {
+                        self->lines[i][j].valid = 0;
+                        self->lines[i][j].tag = 0;
+                }
         }
 }
 
@@ -190,11 +201,15 @@ avdc_resize(avdark_cache_t *self,
 
         /* (Re-)Allocate space for the tags array */
         if (self->lines)
+                for (int i = 0; i < self->number_of_sets; i++)
+                    AVDC_FREE(self->lines[i]);
                 AVDC_FREE(self->lines);
         /* HINT: If you change this, you may have to update
          * avdc_delete() to reflect changes to how thie self->lines
          * array is allocated. */
-        self->lines = AVDC_MALLOC(self->number_of_sets, avdc_cache_line_t);
+        self->lines = AVDC_MALLOC(self->number_of_sets, avdc_cache_line_t*);
+        for (int i = 0; i < self->number_of_sets; i++)
+            self->lines[i] = AVDC_MALLOC(self->assoc, avdc_cache_line_t);
 
         /* Flush the cache, this initializes the tag array to a known state */
         avdc_flush_cache(self);
@@ -214,15 +229,17 @@ void
 avdc_print_internals(avdark_cache_t *self)
 {
         int i;
+        unsigned j;
 
         fprintf(stderr, "Cache Internals\n");
         fprintf(stderr, "size: %d, assoc: %d, line-size: %d\n",
                 self->size, self->assoc, self->block_size);
 
         for (i = 0; i < self->number_of_sets; i++)
-                fprintf(stderr, "tag: <0x%.16lx> valid: %d\n",
-                        (long unsigned int)self->lines[i].tag,
-                        self->lines[i].valid);
+                for (j = 0; j < self->assoc; j++)
+                        fprintf(stderr, "tag: <0x%.16lx> valid: %d\n",
+                                (long unsigned int)self->lines[i][j].tag,
+                                self->lines[i][j].valid);
 }
 
 void
@@ -256,8 +273,11 @@ avdc_new(avdc_size_t size, avdc_block_size_t block_size,
 void
 avdc_delete(avdark_cache_t *self)
 {
-        if (self->lines)
+        if (self->lines) {
+                for (int i = 9; i < self->number_of_sets; i++)
+                        AVDC_FREE(self->lines[i]);
                 AVDC_FREE(self->lines);
+        }
 
         AVDC_FREE(self);
 }
