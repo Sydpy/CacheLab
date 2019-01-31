@@ -38,12 +38,12 @@
 /**
  * Cache block information.
  *
- * TODO: Fill in the data structure
  * HINT: You will probably need to change this structure
  */
 struct avdc_cache_line {
-        avdc_tag_t tag;
-        int        valid;
+        avdc_tag_t  tag;
+        int         valid;
+        unsigned    last_used;
 };
 
 /**
@@ -118,7 +118,8 @@ avdc_dbg_log(avdark_cache_t *self, const char *msg, ...)
 void
 avdc_access(avdark_cache_t *self, avdc_pa_t pa, avdc_access_type_t type)
 {
-        /* TODO: Update this function */
+        static unsigned timestamp = 0;
+
         avdc_tag_t tag = tag_from_pa(self, pa);
         int index = index_from_pa(self, pa);
         int hit = 0;
@@ -127,21 +128,48 @@ avdc_access(avdark_cache_t *self, avdc_pa_t pa, avdc_access_type_t type)
         unsigned set_end = set_start + self->assoc;
         /* position inside the lines of the cache */
         unsigned pos_in_lines = set_start;
-        /* number of valid pages inside the set */
-        int valid = 0;
+        /* keep track of the LRU and first free line in the set */
+        int lru_line = -1;
+        int first_free_line = -1;
+        unsigned lru_timestamp = -1;
+
+        /* Update the timestamp */
+        timestamp++;
+        /* if we overflow the unsigned capacity, flush the cache as
+         * the time stamps are no longer valid */
+        if (timestamp == 0)
+                avdc_flush_cache(self);
+
 
         for(; pos_in_lines < set_end && !hit; pos_in_lines++) {
+
                 if (self->lines[pos_in_lines].valid) {
-                        valid++;
                         hit = self->lines[pos_in_lines].tag == tag;
+
+                        if (self->lines[pos_in_lines].last_used < lru_timestamp) {
+                                lru_timestamp = self->lines[pos_in_lines].last_used;
+                                lru_line = pos_in_lines;
+                        }
+
+                } else if (first_free_line == -1) {
+                        first_free_line = pos_in_lines;
                 }
         }
 
         if (!hit) {
-                /* TODO: replace this for LRU */
-                self->lines[set_start + (valid % self->assoc)].valid = 1;
-                self->lines[set_start + (valid % self->assoc)].tag = tag;
+                /* if we have a free line, we use it
+                 * else we replace the LRU line */
+                if (first_free_line != -1) {
+                        pos_in_lines = first_free_line;
+                } else {
+                        pos_in_lines = lru_line;
+                }
+                self->lines[pos_in_lines].valid = 1;
+                self->lines[pos_in_lines].tag = tag;
         }
+
+        /* update the last used timestamp */
+        self->lines[pos_in_lines].last_used = timestamp;
 
         switch (type) {
         case AVDC_READ: /* Read accesses */
@@ -165,7 +193,6 @@ avdc_access(avdark_cache_t *self, avdc_pa_t pa, avdc_access_type_t type)
 void
 avdc_flush_cache(avdark_cache_t *self)
 {
-        /* TODO: Update this function */
         unsigned line_count = self->number_of_sets * self->assoc;
         for (unsigned i = 0; i < line_count; i++) {
                 self->lines[i].valid = 0;
@@ -178,7 +205,6 @@ int
 avdc_resize(avdark_cache_t *self,
             avdc_size_t size, avdc_block_size_t block_size, avdc_assoc_t assoc)
 {
-		/* TODO: Update this function */
         /* HINT: This function precomputes some common values and
          * allocates the self->lines array. You will need to update
          * this to reflect any changes to how this array is supposed
