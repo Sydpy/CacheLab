@@ -62,7 +62,7 @@ typedef struct {
          * TODO: You may need to change how the internal cache state
          * is stored
          */
-        avdc_cache_line_t **lines;
+        avdc_cache_line_t *lines;
 
         /**
          * Cache parameters. Use avdc_resize() update them.
