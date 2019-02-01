@@ -1,6 +1,7 @@
 test0
 test1
 examples/radix/radix
+examples/multiply/multiply
 pin.log
 
 # Prerequisites
