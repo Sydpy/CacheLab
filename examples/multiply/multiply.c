@@ -43,6 +43,23 @@ matmul_opt()
          * here. It should calculate mat_c := mat_a * mat_b. See
          * matmul_ref() for a reference solution.
          */
+
+        double mat_b_transpose[SIZE][SIZE];
+        int i, j, k;
+
+        for (j = 0; j < SIZE; j++) {
+                for (i = 0; i < SIZE; i++) {
+                        mat_b_transpose[i][j] = mat_b[j][i];
+                }
+        }
+
+        for (j = 0; j < SIZE; j++) {
+                for (i = 0; i < SIZE; i++) {
+                        for (k = 0; k < SIZE; k++) {
+                                mat_c[i][j] += mat_a[i][k] * mat_b_transpose[j][k];
+                        }
+                }
+        }
 }
 
 /**
