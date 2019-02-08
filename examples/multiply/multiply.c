@@ -16,7 +16,7 @@
 #include <string.h>
 
 /* Size of the matrices to multiply */
-#define SIZE 2000
+#define SIZE 500
 
 /* HINT: The Makefile allows you to specify L1 and L2 block sizes as
  * compile time options.These may be specified when calling make,
